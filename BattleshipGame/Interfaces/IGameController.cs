@@ -31,7 +31,7 @@ public interface IGameController
     IPlayer GetOpponent();
     // Returns board of a specific player
     IBoard GetBoard(IPlayer p);
-    List<IShip> GetShips(IPlayer p);
+    IReadOnlyList<IShip> GetShips(IPlayer p);
     // Returns current game status
     GameStatus GetStatus();
     // Returns winner if game is finished, otherwise null

@@ -1,8 +1,8 @@
-using System.Linq;
+
 using Battleship.Enum;
 using Battleship.Interfaces;
-
-namespace Battleship.Models;
+using Battleship.Models;
+namespace Battleship.Controller;
 
 public class GameController : IGameController
 {
@@ -43,29 +43,31 @@ public class GameController : IGameController
     }
 
     public bool PlaceShip(IPlayer player, ShipType shipType, Position position, Orientation orientation)
-{
-    if (_status != GameStatus.Setup) return false;
-
-    var p = (Player)player;
-    if (!ValidatePlacement(p, shipType, position, orientation)) return false;
-
-    var board = (Board)_playerBoards[p];
-    int size = GetShipSize(shipType);
-
-    var ship = new Ship(shipType, position, orientation);
-
-    for (int i = 0; i < size; i++)
     {
-        int x = orientation == Orientation.Horizontal ? position.X + i : position.X;
-        int y = orientation == Orientation.Vertical ? position.Y + i : position.Y;
+        if (_status != GameStatus.Setup) return false;
 
-        var cell = (Cell)board.GetCell(new Position(x, y));
-        cell.Ship = ship; 
+        var p = (Player)player;
+        if (!ValidatePlacement(p, shipType, position, orientation)) return false;
+
+        var board = (Board)_playerBoards[p];
+        int size = GetShipSize(shipType);
+
+        var ship = new Ship(shipType, position, orientation);
+
+        for (int i = 0; i < size; i++)
+        {
+            int x = orientation == Orientation.Horizontal ? position.X + i : position.X;
+            int y = orientation == Orientation.Vertical ? position.Y + i : position.Y;
+
+            var cell = (Cell)board.GetCell(new Position(x, y));
+
+            cell.Ship = ship;
+            cell.State = CellState.Occupied;
+        }
+
+        _playerShips[p].Add(ship);
+        return true;
     }
-
-    _playerShips[p].Add(ship);
-    return true;
-}
 
     public bool MakeMove(Position position)
     {
@@ -76,26 +78,21 @@ public class GameController : IGameController
         var board = (Board)_playerBoards[opponent];
         var cell = (Cell)board.GetCell(position);
 
-        bool isHit = (cell.State == CellState.Occupied);
+        bool isHit = cell.Ship != null;
+
         cell.State = isHit ? CellState.Hit : CellState.Miss;
 
-        // Update status kapal jika terkena
         if (isHit)
-{
-        cell.State = CellState.Hit;
+        {
+            var ship = (Ship)cell.Ship!;
+            ship.Hits++;
+            UpdateShipStatus(ship);
+        }
 
-        var ship = (Ship)cell.Ship!;
-        ship.Hits++;
-
-        UpdateShipStatus(ship);
-    }
         OnMoveProcessed?.Invoke(cell);
 
-        // Chain Hit: Pindah giliran HANYA jika meleset
         if (!CheckWinner() && !isHit)
-        {
             SwitchTurn();
-        }
 
         return true;
     }
@@ -109,7 +106,10 @@ public class GameController : IGameController
         return _playerBoards.Keys.First(p => p != _currentPlayer);
     }
     public IBoard GetBoard(IPlayer p) => _playerBoards[(Player)p];
-    public List<IShip> GetShips(IPlayer p) => _playerShips[(Player)p];
+    public IReadOnlyList<IShip> GetShips(IPlayer p)
+    {
+        return _playerShips[(Player)p];
+    }
 
     private int GetShipSize(ShipType shipType) => shipType switch
     {
@@ -124,6 +124,7 @@ public class GameController : IGameController
     private bool IsInsideBoard(Position position)
     {
         int size = _playerBoards.Values.First().Size;
+        
         return position.X >= 0 && position.X < size && position.Y >= 0 && position.Y < size;
     }
 
@@ -143,7 +144,8 @@ public class GameController : IGameController
             int y = orientation == Orientation.Vertical ? position.Y + i : position.Y;
             var pos = new Position(x, y);
 
-            if (!IsInsideBoard(pos) || IsCellOccupied(board, pos)) return false;
+            if (!IsInsideBoard(pos) || IsCellOccupied(board, pos)) 
+                return false;
         }
         return true;
     }

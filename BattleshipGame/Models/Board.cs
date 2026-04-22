@@ -4,27 +4,29 @@ namespace Battleship.Models;
 
 public class Board : IBoard
 {
-    public int Size { get; set;}
-    public Cell [,] Cells { get; set; }
+    public int Size { get; }
+    public Cell[,] Cells { get; }
 
     public Board(int size)
     {
         Size = size;
         Cells = new Cell[size, size];
 
-        //initialie semua cell nya
-
-        for (int i = 0; i<size; i++)
+        for (int x = 0; x < size; x++)
         {
-            for (int j = 0; j < size; j++)
+            for (int y = 0; y < size; y++)
             {
-                Cells[i, j] = new Cell(new Position(i,j));
+                Cells[x, y] = new Cell(new Position(x, y));
             }
         }
     }
 
     public ICell GetCell(Position position)
     {
+        if (position.X < 0 || position.X >= Size ||
+            position.Y < 0 || position.Y >= Size)
+            throw new ArgumentOutOfRangeException();
+
         return Cells[position.X, position.Y];
     }
 }
