@@ -6,5 +6,4 @@ public interface IBoard
 {
     public int Size {get; }
     ICell GetCell (Position position);
-
 }

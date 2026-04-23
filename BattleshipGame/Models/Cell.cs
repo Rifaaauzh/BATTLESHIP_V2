@@ -5,7 +5,7 @@ namespace Battleship.Models;
 
 public class Cell : ICell
 {
-    public Position Position { get; private set; }
+    public Position Position { get; }
     public CellState State { get; set; }
     public IShip? Ship { get; set; }
 

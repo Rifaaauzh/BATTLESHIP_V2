@@ -10,8 +10,8 @@ public class GameController : IGameController
     private Player? _winner;
     private GameStatus _status;
 
-    private Dictionary<Player, IBoard> _playerBoards;
-    private Dictionary<Player, List<IShip>> _playerShips;
+    private Dictionary<Player, Board> _playerBoards;
+    private Dictionary<Player, List<Ship>> _playerShips;
 
     public event Action<IPlayer>? OnTurnChanged;
     public event Action<ICell>? OnMoveProcessed;
@@ -23,21 +23,24 @@ public class GameController : IGameController
         _currentPlayer = p1;
         _status = GameStatus.Setup;
 
-        _playerBoards = new Dictionary<Player, IBoard>
+       _playerBoards = new Dictionary<Player, Board>
         {
             { p1, new Board(10) },
             { p2, new Board(10) }
         };
-        _playerShips = new Dictionary<Player, List<IShip>>
+
+       _playerShips = new Dictionary<Player, List<Ship>>
         {
-            { p1, new List<IShip>() },
-            { p2, new List<IShip>() }
+            { p1, new List<Ship>() },
+            { p2, new List<Ship>() }
         };
     }
 
     public void StartGame()
     {
-        if (_status != GameStatus.Setup) return;
+        if (_status != GameStatus.Setup) 
+            return;
+
         _status = GameStatus.InProgress;
         OnTurnChanged?.Invoke(_currentPlayer);
     }
@@ -50,11 +53,11 @@ public class GameController : IGameController
         if (!ValidatePlacement(p, shipType, position, orientation)) return false;
 
         var board = (Board)_playerBoards[p];
-        int size = GetShipSize(shipType);
+
 
         var ship = new Ship(shipType, position, orientation);
 
-        for (int i = 0; i < size; i++)
+        for (int i = 0; i < ship.Size ; i++)
         {
             int x = orientation == Orientation.Horizontal ? position.X + i : position.X;
             int y = orientation == Orientation.Vertical ? position.Y + i : position.Y;
@@ -111,15 +114,6 @@ public class GameController : IGameController
         return _playerShips[(Player)p];
     }
 
-    private int GetShipSize(ShipType shipType) => shipType switch
-    {
-        ShipType.Carrier => 5,
-        ShipType.Battleship => 4,
-        ShipType.Cruiser => 3,
-        ShipType.Destroyer => 3,
-        ShipType.PatrolBoat => 2,
-        _ => 0
-    };
 
     private bool IsInsideBoard(Position position)
     {
@@ -135,10 +129,9 @@ public class GameController : IGameController
 
     private bool ValidatePlacement(Player player, ShipType shipType, Position position, Orientation orientation)
     {
-        int size = GetShipSize(shipType);
         var board = (Board)_playerBoards[player];
 
-        for (int i = 0; i < size; i++)
+        for (int i = 0; i < ship.Size; i++)
         {
             int x = orientation == Orientation.Horizontal ? position.X + i : position.X;
             int y = orientation == Orientation.Vertical ? position.Y + i : position.Y;
