@@ -1,4 +1,3 @@
-
 using Battleship.Enum;
 using Battleship.Interfaces;
 using Battleship.Models;

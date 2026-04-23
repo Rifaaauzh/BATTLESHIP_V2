@@ -1,128 +1,96 @@
-﻿using System;
-using Battleship.Models;
+﻿using Battleship.Models;
 using Battleship.Enum;
 using Battleship.Interfaces;
 using Battleship.Controller;
 
 namespace Battleship;
 
+
 class Program
 {
+    static IPlayer? _lastAttacker;
+    static IPlayer? _lastDefender;
     static void Main()
     {
-        Console.WriteLine("====================================================\n");
-        Console.WriteLine("                 BATTLESHIP GAME                    \n");
-        Console.WriteLine("====================================================\n");
+        ShowTitle();
 
-        Console.Write("Enter Player 1 name: ");
-        var p1 = new Player(Console.ReadLine()!);
+        IPlayer p1 = ReadPlayer("Enter Player 1 name: ");
+        IPlayer p2 = ReadPlayer("Enter Player 2 name: ");
 
-        Console.Write("Enter Player 2 name: ");
-        var p2 = new Player(Console.ReadLine()!);
+        IGameController game = new GameController((Player)p1, (Player)p2);
 
-        var game = new GameController(p1, p2);
-        
-        // Event to show user whose turn it is
-
-        game.OnTurnChanged += player =>
-        {
-            Console.WriteLine($"\n Turn: {player.Name}");
-        };
-
-        // Event to show move result of attack HIT (RED) and MISS (YELLOW) begitu
-        game.OnMoveProcessed += cell =>
-        {
-            if (cell.State == CellState.Hit)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(" HIT!");
-            }
-            else if (cell.State == CellState.Miss)
-            {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine(" MISS!");
-            }
-
-            Console.ResetColor();
-        };
-
-        //  Event to show when the ship is sunk, and which type is it
-        game.OnShipSunk += ship =>
-        {
-            Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine($" {ship.ShipType} SUNK!");
-            Console.ResetColor();
-        };
-
-        //  Event to show when the game is over
-        game.OnGameOver += player =>
-        {
-            Console.Clear();
-            Console.WriteLine("================================");
-            Console.WriteLine(" GAME OVER");
-            Console.WriteLine($"Winner: {player.Name}");
-            Console.WriteLine("================================");
-        };
+        // UI subscribe event
+        RegisterEvents(game);
 
         // Setup phase
-        SetupPhase(game, p1);
-        SetupPhase(game, p2);
+        RunSetupPhase(game, p1);
+        RunSetupPhase(game, p2);
 
-        game.StartGame();
-
-        // Game loop
-        while (game.GetStatus() != GameStatus.End)
+        // Start game
+        if (!game.StartGame())
         {
-            Console.Clear();
-            var current = game.GetCurrentPlayer();
-
-            Console.WriteLine($"=== {current.Name}'s Turn ===\n");
-
-            // Enemy board
-            Console.WriteLine("Enemy Board:");
-            PrintBoard(game.GetBoard(game.GetOpponent()), true);
-
-            Console.WriteLine();
-
-            // Own board
-            Console.WriteLine("Your Board:");
-            PrintBoard(game.GetBoard(current), false);
-
-            Console.WriteLine();
-
-            // Input attack
-            Console.Write("Enter attack (x y): ");
-            var input = Console.ReadLine()?.Split(' ');
-
-            if (input == null || input.Length != 2 ||
-                !int.TryParse(input[0], out int x) ||
-                !int.TryParse(input[1], out int y))
-            {
-                Console.WriteLine("Invalid input! Press any key...");
-                Console.ReadKey();
-                continue;
-            }
-
-            bool success = game.MakeMove(new Position(x, y));
-
-            if (!success)
-            {
-                Console.WriteLine(" Invalid move!");
-            }
-
-            Console.ReadKey();
+            ShowMessage("Game could not be started.", ConsoleColor.Yellow);
+            Wait();
+            return;
         }
 
+        // Main game loop
+        RunMainGameLoop(game);
+
         Console.Clear();
-        Console.WriteLine($" Winner: {game.GetWinner()!.Name}");
+        Console.WriteLine("====================================");
+        Console.WriteLine($"FINAL WINNER: {game.GetWinner()!.Name}");
+        Console.WriteLine("====================================");
+        Wait();
     }
 
-    // ================= SETUP =================
-    static void SetupPhase(GameController game, Player player)
+    static IPlayer ReadPlayer(string prompt)
     {
-        Console.Clear();
-        Console.WriteLine($"=== {player.Name} - Place Your Ships ===\n");
+        Console.Write(prompt);
+        return new Player(Console.ReadLine()!);
+    }
 
+    static void RegisterEvents(IGameController game)
+{
+    game.OnTurnChanged += player =>
+    {
+        ShowMessage($"Now playing: {player.Name}", ConsoleColor.Cyan);
+    };
+
+    game.OnMoveProcessed += cell =>
+    {
+        if (cell.State == CellState.Hit)
+        {
+            ShowMessage(
+                $"{_lastAttacker?.Name} hit {_lastDefender?.Name}'s ship!",
+                ConsoleColor.Red
+            );
+        }
+        else if (cell.State == CellState.Miss)
+        {
+            ShowMessage(
+                $"{_lastAttacker?.Name} missed!",
+                ConsoleColor.Yellow
+            );
+        }
+    };
+
+    game.OnShipSunk += ship =>
+    {
+        ShowMessage(
+            $"{_lastDefender?.Name}'s {ship.ShipType} was sunk!",
+            ConsoleColor.Magenta
+        );
+    };
+
+    game.OnGameOver += player =>
+    {
+        ShowMessage($"Game Over! Winner: {player.Name}", ConsoleColor.Green);
+    };
+}
+
+    static void RunSetupPhase(IGameController game, IPlayer player)
+    {
         foreach (ShipType type in System.Enum.GetValues(typeof(ShipType)))
         {
             bool placed = false;
@@ -130,70 +98,167 @@ class Program
             while (!placed)
             {
                 Console.Clear();
-                Console.WriteLine($"=== {player.Name} - Place Your Ships ===\n");
-                Console.WriteLine($"Placing: {type}\n\n");
-                
-                Console.WriteLine("How to place ships:");
-                Console.WriteLine("- Enter coordinates: x y (example: 3 4)");
-                Console.WriteLine("- H = Horizontal (→), V = Vertical (↓)\n");
+                DrawSetupScreen(game, player, type);
 
-                PrintBoard(game.GetBoard(player), false);
+                Position position = ReadPosition("\nPosition (x y): ");
+                Orientation orientation = ReadOrientation("Orientation (H/V): ");
 
-                Console.Write("\nEnter position (x y): ");
-                var posInput = Console.ReadLine()?.Split(' ');
-
-                if (posInput == null || posInput.Length != 2 ||
-                    !int.TryParse(posInput[0], out int x) ||
-                    !int.TryParse(posInput[1], out int y))
-                {
-                    Console.WriteLine("Invalid input!");
-                    Console.ReadKey();
-                    continue;
-                }
-
-                Console.Write("Orientation [H = Horizontal →, V = Vertical ↓]: ");
-                var ori = Console.ReadLine()?.ToUpper();
-
-                if (ori != "H" && ori != "V")
-                {
-                    Console.WriteLine("Invalid orientation!");
-                    Console.ReadKey();
-                    continue;
-                }
-
-                var orientation = ori == "H"
-                    ? Orientation.Horizontal
-                    : Orientation.Vertical;
-
-                placed = game.PlaceShip(player, type, new Position(x, y), orientation);
+                placed = game.PlaceShip(player, type, position, orientation);
 
                 if (placed)
                 {
-                    Console.Clear();
-                    Console.WriteLine("Ship placed successfully!\n");
-
-                    PrintBoard(game.GetBoard(player), false);
-
-                    Console.WriteLine("\nPress any key...");
-                    Console.ReadKey();
+                    ShowMessage("Ship placed successfully!", ConsoleColor.Green);
                 }
                 else
                 {
-                    Console.WriteLine("Invalid placement! Try again.");
-                    Console.ReadKey();
+                    ShowMessage(
+                        "Invalid placement. Ship may be outside the board or overlapping another ship.",
+                        ConsoleColor.Yellow
+                    );
                 }
+
+                Wait();
             }
         }
 
-        Console.WriteLine("\nAll ships placed!");
-        Console.WriteLine("Press any key to continue...");
-        Console.ReadKey();
+        ShowMessage($"{player.Name} has placed all ships!", ConsoleColor.Green);
+        Wait();
     }
 
-    // ================= BOARD PRINT =================
+    static void RunMainGameLoop(IGameController game)
+    {
+        while (game.GetStatus() != GameStatus.End)
+        {
+            Console.Clear();
+
+            IPlayer currentPlayer = game.GetCurrentPlayer();
+            IPlayer opponentPlayer = game.GetOpponent();
+
+            DrawBattleScreen(game, currentPlayer, opponentPlayer);
+
+            Position attackPosition = ReadPosition("\nAttack (x y): ");
+
+            _lastAttacker = currentPlayer;
+            _lastDefender = opponentPlayer;
+
+            bool success = game.MakeMove(attackPosition);
+
+            if (!success)
+            {
+                ShowMessage(
+                    "Invalid move. The position may be outside the board or already attacked.",
+                    ConsoleColor.Yellow
+                );
+            }
+
+            Wait();
+        }
+    }
+
+
+    static void ShowTitle()
+    {
+        Console.WriteLine("============================================================================================\n");
+        Console.WriteLine("                                   BATTLESHIP GAME                                          \n");
+        Console.WriteLine("============================================================================================\n");
+    }
+
+    static void DrawSetupScreen(IGameController game, IPlayer player, ShipType currentShip)
+    {
+        Console.WriteLine("====================================");
+        Console.WriteLine($"{player.Name} - Place Your Ships");
+        Console.WriteLine("====================================\n");
+
+        Console.WriteLine($"Current ship: {currentShip}");
+        Console.WriteLine("Enter position in format: x y");
+        Console.WriteLine("Example: 3 4");
+        Console.WriteLine("Orientation: H = Horizontal, V = Vertical\n");
+
+        PrintBoard(game.GetBoard(player), false);
+    }
+
+    static void DrawBattleScreen(IGameController game, IPlayer currentPlayer, IPlayer opponentPlayer)
+    {
+        Console.WriteLine("====================================");
+        Console.WriteLine($"TURN: {currentPlayer.Name}");
+        Console.WriteLine("====================================\n");
+
+        Console.WriteLine("Enemy Board");
+        PrintBoard(game.GetBoard(opponentPlayer), true);
+
+        Console.WriteLine();
+
+        Console.WriteLine("Your Board");
+        PrintBoard(game.GetBoard(currentPlayer), false);
+
+        Console.WriteLine();
+        Console.WriteLine("Enter attack position in format: x y");
+        Console.WriteLine("Example: 3 4");
+    }
+
+    static Position ReadPosition(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            var input = Console.ReadLine()?.Split(' ');
+
+            if (TryParsePosition(input, out Position position))
+                return position;
+
+            ShowMessage("Input is invalid. Use format: x y", ConsoleColor.Yellow);
+        }
+    }
+
+    static Orientation ReadOrientation(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            var input = Console.ReadLine()?.Trim().ToUpper();
+
+            if (TryParseOrientation(input, out Orientation orientation))
+                return orientation;
+
+            ShowMessage("Orientation is invalid. Use H or V.", ConsoleColor.Yellow);
+        }
+    }
+
+    static bool TryParsePosition(string[]? input, out Position position)
+    {
+        position = new Position(0, 0);
+
+        if (input == null || input.Length != 2)
+            return false;
+
+        if (!int.TryParse(input[0], out int x) || !int.TryParse(input[1], out int y))
+            return false;
+
+        position = new Position(x, y);
+        return true;
+    }
+
+    static bool TryParseOrientation(string? input, out Orientation orientation)
+    {
+        orientation = Orientation.Horizontal;
+
+        if (input == "H")
+        {
+            orientation = Orientation.Horizontal;
+            return true;
+        }
+
+        if (input == "V")
+        {
+            orientation = Orientation.Vertical;
+            return true;
+        }
+
+        return false;
+    }
+
     static void PrintBoard(IBoard board, bool hideShips)
     {
-        // X axis
         Console.Write("  ");
         for (int x = 0; x < board.Size; x++)
             Console.Write(x + " ");
@@ -205,18 +270,33 @@ class Program
 
             for (int x = 0; x < board.Size; x++)
             {
-                var cell = board.GetCell(new Position(x, y));
+                ICell cell = board.GetCell(new Position(x, y));
+                char symbol = '.';
 
-                char c = '.';
+                if (cell.State == CellState.Hit)
+                    symbol = 'X';
+                else if (cell.State == CellState.Miss)
+                    symbol = 'O';
+                else if (!hideShips && cell.Ship != null)
+                    symbol = 'S';
 
-                if (cell.State == CellState.Hit) c = 'X';
-                else if (cell.State == CellState.Miss) c = 'O';
-                else if (!hideShips && cell.Ship != null) c = 'S';
-
-                Console.Write(c + " ");
+                Console.Write(symbol + " ");
             }
 
             Console.WriteLine();
         }
+    }
+
+    static void ShowMessage(string message, ConsoleColor color)
+    {
+        Console.ForegroundColor = color;
+        Console.WriteLine(message);
+        Console.ResetColor();
+    }
+
+    static void Wait()
+    {
+        Console.WriteLine("\nPress any key to continue...");
+        Console.ReadKey();
     }
 }

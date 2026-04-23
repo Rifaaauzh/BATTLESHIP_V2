@@ -26,6 +26,7 @@ public class Ship : IShip
             ShipType.Cruiser => 3,
             ShipType.Destroyer => 3,
             ShipType.PatrolBoat => 2,
+            _ => 0
         };
     }
     
