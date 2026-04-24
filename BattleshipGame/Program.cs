@@ -39,7 +39,7 @@ class Program
 
         Console.Clear();
         Console.WriteLine("====================================");
-        Console.WriteLine($"FINAL WINNER: {game.GetWinner()!.Name}");
+        Console.WriteLine($"FINAL WINNER: {game.GetWinner().Name}");
         Console.WriteLine("====================================");
         Wait();
     }
@@ -201,7 +201,7 @@ class Program
         while (true)
         {
             Console.Write(prompt);
-            var input = Console.ReadLine()?.Split(' ');
+            var input = Console.ReadLine().Split(' ');
 
             if (TryParsePosition(input, out Position position))
                 return position;
@@ -215,7 +215,7 @@ class Program
         while (true)
         {
             Console.Write(prompt);
-            var input = Console.ReadLine()?.Trim().ToUpper();
+            var input = Console.ReadLine().Trim().ToUpper();
 
             if (TryParseOrientation(input, out Orientation orientation))
                 return orientation;
